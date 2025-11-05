@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
   <meta charset="UTF-8" />
-  <title>FPS Shooter with Chat</title>
+  <title>FPS Shooter with Chat & Sync</title>
   <style>
     body { margin: 0; overflow: hidden; font-family: sans-serif; }
     canvas { display: block; }
@@ -42,21 +42,19 @@
     import * as THREE from 'https://cdn.skypack.dev/three';
     import { PointerLockControls } from 'https://cdn.skypack.dev/three/examples/jsm/controls/PointerLockControls.js';
 
-    // Three.jsの基本設定
     const scene = new THREE.Scene();
     const camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 1000);
     const renderer = new THREE.WebGLRenderer();
     renderer.setSize(window.innerWidth, window.innerHeight);
     document.body.appendChild(renderer.domElement);
 
-    // 地面
-    const floorGeometry = new THREE.PlaneGeometry(100, 100);
-    const floorMaterial = new THREE.MeshBasicMaterial({ color: 0x228B22 });
-    const floor = new THREE.Mesh(floorGeometry, floorMaterial);
+    const floor = new THREE.Mesh(
+      new THREE.PlaneGeometry(100, 100),
+      new THREE.MeshBasicMaterial({ color: 0x228B22 })
+    );
     floor.rotation.x = -Math.PI / 2;
     scene.add(floor);
 
-    // FPS操作
     const controls = new PointerLockControls(camera, document.body);
     document.body.addEventListener('click', () => controls.lock());
 
@@ -80,6 +78,60 @@
 
     camera.position.y = 1.6;
 
+    // 他プレイヤーのモデル管理
+    const players = new Map();
+
+    // WebSocket通信
+    const socket = new WebSocket('ws://localhost:3000');
+    let myId = null;
+
+    socket.addEventListener('message', (event) => {
+      const data = JSON.parse(event.data);
+
+      if (data.type === 'id') {
+        myId = data.id;
+      }
+
+      if (data.type === 'chat') {
+        const msg = document.createElement('div');
+        msg.textContent = `Player ${data.id}: ${data.message}`;
+        messages.appendChild(msg);
+        messages.scrollTop = messages.scrollHeight;
+      }
+
+      if (data.type === 'position') {
+        if (data.id === myId) return;
+
+        let player = players.get(data.id);
+        if (!player) {
+          const geometry = new THREE.BoxGeometry(0.5, 1.6, 0.5);
+          const material = new THREE.MeshBasicMaterial({ color: 0xff0000 });
+          player = new THREE.Mesh(geometry, material);
+          scene.add(player);
+          players.set(data.id, player);
+        }
+        player.position.set(data.x, data.y, data.z);
+      }
+
+      if (data.type === 'leave') {
+        const player = players.get(data.id);
+        if (player) {
+          scene.remove(player);
+          players.delete(data.id);
+        }
+      }
+    });
+
+    const input = document.getElementById('input');
+    const messages = document.getElementById('messages');
+
+    input.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' && input.value.trim() !== '') {
+        socket.send(JSON.stringify({ type: 'chat', message: input.value }));
+        input.value = '';
+      }
+    });
+
     function animate() {
       requestAnimationFrame(animate);
 
@@ -92,32 +144,16 @@
         velocity.z = direction.z * 0.1;
         controls.moveRight(velocity.x);
         controls.moveForward(velocity.z);
+
+        // 自分の位置を送信
+        const pos = camera.position;
+        socket.send(JSON.stringify({ type: 'position', x: pos.x, y: pos.y, z: pos.z }));
       }
 
       renderer.render(scene, camera);
     }
 
     animate();
-
-    // WebSocketチャット
-    const socket = new WebSocket('ws://localhost:3000'); // RenderにデプロイしたらURL変更！
-
-    const input = document.getElementById('input');
-    const messages = document.getElementById('messages');
-
-    input.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter' && input.value.trim() !== '') {
-        socket.send(input.value);
-        input.value = '';
-      }
-    });
-
-    socket.addEventListener('message', (event) => {
-      const msg = document.createElement('div');
-      msg.textContent = event.data;
-      messages.appendChild(msg);
-      messages.scrollTop = messages.scrollHeight;
-    });
   </script>
 </body>
 </html>
