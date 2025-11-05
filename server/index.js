@@ -10,7 +10,6 @@ wss.on('connection', (ws) => {
   clients.set(ws, id);
   console.log(`🌐 クライアント接続！ID: ${id}`);
 
-  // 接続時にIDを送信
   ws.send(JSON.stringify({ type: 'id', id }));
 
   ws.on('message', (message) => {
@@ -19,14 +18,17 @@ wss.on('connection', (ws) => {
       const parsed = JSON.parse(data);
 
       if (parsed.type === 'chat') {
-        // チャットメッセージを全員に送信
         broadcast({ type: 'chat', id, message: parsed.message });
       }
 
       if (parsed.type === 'position') {
-        // プレイヤー位置を全員に送信（自分以外）
         broadcast({ type: 'position', id, x: parsed.x, y: parsed.y, z: parsed.z }, ws);
       }
+
+      if (parsed.type === 'hit') {
+        broadcast({ type: 'hit', attacker: id, target: parsed.target });
+      }
+
     } catch (err) {
       console.error('❌ JSON解析エラー:', err);
     }
