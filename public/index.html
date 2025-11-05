@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
   <meta charset="UTF-8" />
-  <title>FPS Shooter with Chat & Sync</title>
+  <title>FPS Shooter with Hit Detection</title>
   <style>
     body { margin: 0; overflow: hidden; font-family: sans-serif; }
     canvas { display: block; }
@@ -78,10 +78,7 @@
 
     camera.position.y = 1.6;
 
-    // 他プレイヤーのモデル管理
     const players = new Map();
-
-    // WebSocket通信
     const socket = new WebSocket('ws://localhost:3000');
     let myId = null;
 
@@ -107,6 +104,7 @@
           const geometry = new THREE.BoxGeometry(0.5, 1.6, 0.5);
           const material = new THREE.MeshBasicMaterial({ color: 0xff0000 });
           player = new THREE.Mesh(geometry, material);
+          player.userData.id = data.id;
           scene.add(player);
           players.set(data.id, player);
         }
@@ -120,6 +118,13 @@
           players.delete(data.id);
         }
       }
+
+      if (data.type === 'hit') {
+        const msg = document.createElement('div');
+        msg.textContent = `💥 Player ${data.target} was hit by Player ${data.attacker}`;
+        messages.appendChild(msg);
+        messages.scrollTop = messages.scrollHeight;
+      }
     });
 
     const input = document.getElementById('input');
@@ -129,6 +134,21 @@
       if (e.key === 'Enter' && input.value.trim() !== '') {
         socket.send(JSON.stringify({ type: 'chat', message: input.value }));
         input.value = '';
+      }
+    });
+
+    // 発射処理（左クリック）
+    document.addEventListener('mousedown', () => {
+      if (!controls.isLocked) return;
+
+      const raycaster = new THREE.Raycaster();
+      raycaster.setFromCamera(new THREE.Vector2(0, 0), camera);
+      const intersects = raycaster.intersectObjects([...players.values()]);
+
+      if (intersects.length > 0) {
+        const hitPlayer = intersects[0].object;
+        const targetId = hitPlayer.userData.id;
+        socket.send(JSON.stringify({ type: 'hit', target: targetId }));
       }
     });
 
@@ -145,7 +165,6 @@
         controls.moveRight(velocity.x);
         controls.moveForward(velocity.z);
 
-        // 自分の位置を送信
         const pos = camera.position;
         socket.send(JSON.stringify({ type: 'position', x: pos.x, y: pos.y, z: pos.z }));
       }
