@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <title>FPS Shooter</title>
+  <style>
+    body { margin: 0; overflow: hidden; }
+    canvas { display: block; }
+  </style>
+</head>
+<body>
+  <script type="module">
+    import * as THREE from 'https://cdn.skypack.dev/three';
+    import { PointerLockControls } from 'https://cdn.skypack.dev/three/examples/jsm/controls/PointerLockControls.js';
+
+    const scene = new THREE.Scene();
+    const camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 1000);
+    const renderer = new THREE.WebGLRenderer();
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    document.body.appendChild(renderer.domElement);
+
+    // 地面
+    const floorGeometry = new THREE.PlaneGeometry(100, 100);
+    const floorMaterial = new THREE.MeshBasicMaterial({ color: 0x228B22 });
+    const floor = new THREE.Mesh(floorGeometry, floorMaterial);
+    floor.rotation.x = -Math.PI / 2;
+    scene.add(floor);
+
+    // プレイヤー操作
+    const controls = new PointerLockControls(camera, document.body);
+    document.body.addEventListener('click', () => controls.lock());
+
+    const velocity = new THREE.Vector3();
+    const direction = new THREE.Vector3();
+    const move = { forward: false, backward: false, left: false, right: false };
+
+    document.addEventListener('keydown', (e) => {
+      if (e.code === 'KeyE') move.forward = true;
+      if (e.code === 'KeyS') move.backward = true;
+      if (e.code === 'KeyQ') move.left = true;
+      if (e.code === 'KeyC') move.right = true;
+    });
+
+    document.addEventListener('keyup', (e) => {
+      if (e.code === 'KeyE') move.forward = false;
+      if (e.code === 'KeyS') move.backward = false;
+      if (e.code === 'KeyQ') move.left = false;
+      if (e.code === 'KeyC') move.right = false;
+    });
+
+    camera.position.y = 1.6;
+
+    function animate() {
+      requestAnimationFrame(animate);
+
+      direction.z = Number(move.forward) - Number(move.backward);
+      direction.x = Number(move.right) - Number(move.left);
+      direction.normalize();
+
+      if (controls.isLocked) {
+        velocity.x = direction.x * 0.1;
+        velocity.z = direction.z * 0.1;
+        controls.moveRight(velocity.x);
+        controls.moveForward(velocity.z);
+      }
+
+      renderer.render(scene, camera);
+    }
+
+    animate();
+  </script>
+</body>
+</html>
