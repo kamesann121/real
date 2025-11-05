@@ -2,17 +2,47 @@
 <html lang="ja">
 <head>
   <meta charset="UTF-8" />
-  <title>FPS Shooter</title>
+  <title>FPS Shooter with Chat</title>
   <style>
-    body { margin: 0; overflow: hidden; }
+    body { margin: 0; overflow: hidden; font-family: sans-serif; }
     canvas { display: block; }
+
+    #chat {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      width: 100%;
+      background: rgba(0,0,0,0.5);
+      color: white;
+      padding: 10px;
+      box-sizing: border-box;
+    }
+
+    #messages {
+      max-height: 150px;
+      overflow-y: auto;
+      font-size: 14px;
+    }
+
+    #input {
+      width: 100%;
+      padding: 5px;
+      font-size: 14px;
+      box-sizing: border-box;
+    }
   </style>
 </head>
 <body>
+  <div id="chat">
+    <div id="messages"></div>
+    <input id="input" type="text" placeholder="チャットを入力してEnterで送信" />
+  </div>
+
   <script type="module">
     import * as THREE from 'https://cdn.skypack.dev/three';
     import { PointerLockControls } from 'https://cdn.skypack.dev/three/examples/jsm/controls/PointerLockControls.js';
 
+    // Three.jsの基本設定
     const scene = new THREE.Scene();
     const camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 1000);
     const renderer = new THREE.WebGLRenderer();
@@ -26,7 +56,7 @@
     floor.rotation.x = -Math.PI / 2;
     scene.add(floor);
 
-    // プレイヤー操作
+    // FPS操作
     const controls = new PointerLockControls(camera, document.body);
     document.body.addEventListener('click', () => controls.lock());
 
@@ -68,6 +98,26 @@
     }
 
     animate();
+
+    // WebSocketチャット
+    const socket = new WebSocket('ws://localhost:3000'); // RenderにデプロイしたらURLを変更！
+
+    const input = document.getElementById('input');
+    const messages = document.getElementById('messages');
+
+    input.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' && input.value.trim() !== '') {
+        socket.send(input.value);
+        input.value = '';
+      }
+    });
+
+    socket.addEventListener('message', (event) => {
+      const msg = document.createElement('div');
+      msg.textContent = event.data;
+      messages.appendChild(msg);
+      messages.scrollTop = messages.scrollHeight;
+    });
   </script>
 </body>
 </html>
