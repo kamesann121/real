@@ -1,25 +1,49 @@
 import { WebSocketServer } from 'ws';
 
 const wss = new WebSocketServer({ port: 3000 });
-const clients = new Set();
+const clients = new Map(); // ws → id
+
+let nextId = 1;
 
 wss.on('connection', (ws) => {
-  clients.add(ws);
-  console.log('🌐 クライアント接続！');
+  const id = nextId++;
+  clients.set(ws, id);
+  console.log(`🌐 クライアント接続！ID: ${id}`);
+
+  // 接続時にIDを送信
+  ws.send(JSON.stringify({ type: 'id', id }));
 
   ws.on('message', (message) => {
-    console.log('💬 受信:', message.toString());
+    const data = message.toString();
+    try {
+      const parsed = JSON.parse(data);
 
-    // 全クライアントにブロードキャスト
-    for (const client of clients) {
-      if (client.readyState === ws.OPEN) {
-        client.send(message.toString());
+      if (parsed.type === 'chat') {
+        // チャットメッセージを全員に送信
+        broadcast({ type: 'chat', id, message: parsed.message });
       }
+
+      if (parsed.type === 'position') {
+        // プレイヤー位置を全員に送信（自分以外）
+        broadcast({ type: 'position', id, x: parsed.x, y: parsed.y, z: parsed.z }, ws);
+      }
+    } catch (err) {
+      console.error('❌ JSON解析エラー:', err);
     }
   });
 
   ws.on('close', () => {
     clients.delete(ws);
-    console.log('👋 クライアント切断');
+    broadcast({ type: 'leave', id });
+    console.log(`👋 クライアント切断 ID: ${id}`);
   });
 });
+
+function broadcast(data, exclude) {
+  const json = JSON.stringify(data);
+  for (const client of clients.keys()) {
+    if (client.readyState === client.OPEN && client !== exclude) {
+      client.send(json);
+    }
+  }
+}
