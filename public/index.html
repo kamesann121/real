@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
   <meta charset="UTF-8" />
-  <title>FPS Shooter with Hit Detection</title>
+  <title>FPS Shooter with HP</title>
   <style>
     body { margin: 0; overflow: hidden; font-family: sans-serif; }
     canvas { display: block; }
@@ -111,17 +111,22 @@
         player.position.set(data.x, data.y, data.z);
       }
 
+      if (data.type === 'hit') {
+        const msg = document.createElement('div');
+        msg.textContent = `💥 Player ${data.target} was hit by Player ${data.attacker}`;
+        messages.appendChild(msg);
+        messages.scrollTop = messages.scrollHeight;
+      }
+
       if (data.type === 'leave') {
         const player = players.get(data.id);
         if (player) {
           scene.remove(player);
           players.delete(data.id);
         }
-      }
 
-      if (data.type === 'hit') {
         const msg = document.createElement('div');
-        msg.textContent = `💥 Player ${data.target} was hit by Player ${data.attacker}`;
+        msg.textContent = `💀 Player ${data.id} has been eliminated`;
         messages.appendChild(msg);
         messages.scrollTop = messages.scrollHeight;
       }
@@ -137,7 +142,6 @@
       }
     });
 
-    // 発射処理（左クリック）
     document.addEventListener('mousedown', () => {
       if (!controls.isLocked) return;
 
