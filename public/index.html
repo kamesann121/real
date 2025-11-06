@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
   <meta charset="UTF-8" />
-  <title>FPS Shooter with HP</title>
+  <title>FPS Shooter with GLB Models</title>
   <style>
     body { margin: 0; overflow: hidden; font-family: sans-serif; }
     canvas { display: block; }
@@ -41,6 +41,7 @@
   <script type="module">
     import * as THREE from 'https://cdn.skypack.dev/three';
     import { PointerLockControls } from 'https://cdn.skypack.dev/three/examples/jsm/controls/PointerLockControls.js';
+    import { GLTFLoader } from 'https://cdn.skypack.dev/three/examples/jsm/loaders/GLTFLoader.js';
 
     const scene = new THREE.Scene();
     const camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 1000);
@@ -80,6 +81,7 @@
 
     const players = new Map();
     const socket = new WebSocket('ws://localhost:3000');
+    const loader = new GLTFLoader();
     let myId = null;
 
     socket.addEventListener('message', (event) => {
@@ -101,13 +103,17 @@
 
         let player = players.get(data.id);
         if (!player) {
-          const geometry = new THREE.BoxGeometry(0.5, 1.6, 0.5);
-          const material = new THREE.MeshBasicMaterial({ color: 0xff0000 });
-          player = new THREE.Mesh(geometry, material);
-          player.userData.id = data.id;
-          scene.add(player);
-          players.set(data.id, player);
+          loader.load('models/character.glb', (gltf) => {
+            const model = gltf.scene;
+            model.scale.set(1, 1, 1); // 必要に応じて調整！
+            model.userData.id = data.id;
+            scene.add(model);
+            players.set(data.id, model);
+            model.position.set(data.x, data.y, data.z);
+          });
+          return;
         }
+
         player.position.set(data.x, data.y, data.z);
       }
 
@@ -147,12 +153,14 @@
 
       const raycaster = new THREE.Raycaster();
       raycaster.setFromCamera(new THREE.Vector2(0, 0), camera);
-      const intersects = raycaster.intersectObjects([...players.values()]);
+      const intersects = raycaster.intersectObjects([...players.values()], true);
 
       if (intersects.length > 0) {
         const hitPlayer = intersects[0].object;
         const targetId = hitPlayer.userData.id;
-        socket.send(JSON.stringify({ type: 'hit', target: targetId }));
+        if (targetId) {
+          socket.send(JSON.stringify({ type: 'hit', target: targetId }));
+        }
       }
     });
 
